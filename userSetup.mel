@@ -1,0 +1,4 @@
+// Put this directly in your scripts folder
+
+source menuItemToShelf.mel;
+evalDeferred("python(\"import neo_shelf;\nfrom neo_shelf import core, widgets, manager\")");
