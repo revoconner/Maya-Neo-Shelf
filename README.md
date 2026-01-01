@@ -15,7 +15,7 @@ A new shelf design for maya, compatible with original shelf code with some extra
 - Edit multiple items in one go.
 - Close shelf without losing data
 
-<details><summary> Open Screenshots </summary>
+<details><summary> <h3> Open Screenshots </h3> </summary>
   
 ### Layout with alignment options, or stack them as tabs, change background colors, icon size, icon tint etc, and import existing shelf panels
 <img width="250" height="auto" alt="image" src="https://github.com/user-attachments/assets/ca25bb6f-51ad-4b9e-b0b1-2ba1fe23db20" />
@@ -36,4 +36,11 @@ A new shelf design for maya, compatible with original shelf code with some extra
 
 </details>
 
-## Tested with Maya 2025 and 2026
+## Installation and User Manual
+
+Visit: [USER GUIDE WIKI](https://github.com/revoconner/Maya-Neo-Shelf/wiki/User-Guide)
+
+## Version 1.0  
+
+- While personally tested, make sure to backup your config file often to avoid customisation loss.
+- Tested with Maya 2025 and 2026
