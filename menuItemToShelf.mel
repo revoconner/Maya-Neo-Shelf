@@ -1,0 +1,8 @@
+// replace the global procedure of adding items to shelf so that the neo shelf acts like native shelves.
+
+//Put this directly in your scripts folder.
+
+global proc menuItemToShelf(string $itemName)
+{
+    python("from neo_shelf import hook; hook.add_menu_item_to_shelf('" + $itemName + "')");
+}
