@@ -1,6 +1,9 @@
 # Maya - Neo Shelf
-A new shelf design for maya, compatible with original shelf code with some extra goodies!
-<img width="1500" height="auto" alt="image" src="https://github.com/user-attachments/assets/c534d9c7-6708-4534-9237-d567992e0c9c" />
+
+<div align="center">
+<h4>Maya - Neo Shelf! A modern replacement for Maya's native shelf with full compatibility. </h4>
+<img width="640" alt="logo" src="https://github.com/user-attachments/assets/10b6547d-90af-4e9e-87d9-730f5a3cd9e0" />
+</div>
 
 ## Features
 - Import existing shelf
