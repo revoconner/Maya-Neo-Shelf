@@ -1,4 +1,4 @@
-# Maya - Neo Shelf
+# Neo Shelf for Autodesk Maya
 
 <div align="center">
 <h4>Maya - Neo Shelf! A modern replacement for Maya's native shelf with full compatibility. </h4>
@@ -47,3 +47,4 @@ Visit: [USER GUIDE WIKI](https://github.com/revoconner/Maya-Neo-Shelf/wiki/User-
 
 - While personally tested, make sure to backup your config file often to avoid customisation loss.
 - Tested with Maya 2025 and 2026
+- **Minor Bug** - When closing or opening a panel, the selection might change to the panel item on top. Please take note of which panel you are editing before making any changes.
