@@ -665,6 +665,20 @@ class FlowBreakWidget(QWidget):
         self._drag_start_pos = None
 
 
+class ShelfScrollArea(QScrollArea):
+    def __init__(self, parent=None):
+        super(ShelfScrollArea, self).__init__(parent)
+        self.redirect_wheel = False
+
+    def wheelEvent(self, event):
+        if self.redirect_wheel:
+            bar = self.horizontalScrollBar()
+            bar.setValue(bar.value() - event.angleDelta().y())
+            event.accept()
+        else:
+            super(ShelfScrollArea, self).wheelEvent(event)
+
+
 class ShelfPanel(MayaQWidgetDockableMixin, QWidget):
     """Dockable shelf panel widget."""
 
@@ -693,7 +707,7 @@ class ShelfPanel(MayaQWidgetDockableMixin, QWidget):
         self._main_layout.setContentsMargins(2, 2, 2, 2)
         self._main_layout.setSpacing(0)
 
-        self._scroll = QScrollArea()
+        self._scroll = ShelfScrollArea()
         self._scroll.setWidgetResizable(True)
         self._scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         self._scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
@@ -727,6 +741,8 @@ class ShelfPanel(MayaQWidgetDockableMixin, QWidget):
             "right": Qt.AlignRight
         }
         h_align = h_align_map.get(alignment, Qt.AlignLeft)
+
+        self._scroll.redirect_wheel = (layout_mode == "horizontal")
 
         if layout_mode == "horizontal":
             self._button_layout = QHBoxLayout(self._content)
