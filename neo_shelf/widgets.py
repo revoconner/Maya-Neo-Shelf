@@ -250,7 +250,7 @@ class ShelfButton(QToolButton):
         self._update_appearance()
 
     def _update_appearance(self):
-        icon_size = max(self._icon_size, 35)
+        icon_size = max(self._icon_size, 10)
         label = self._data.get("label", "")
 
         self.setToolButtonStyle(Qt.ToolButtonIconOnly)
@@ -269,13 +269,15 @@ class ShelfButton(QToolButton):
             full_path = ":{}".format(icon_path)
 
         icon_tint = self._data.get("icon_tint")
+        dpr = QApplication.instance().devicePixelRatio()
+        phys_size = int(icon_size * dpr)
 
         # SVG files need QIcon directly, raster images use QPixmap for scaling
         if icon_path.lower().endswith(".svg"):
             icon = QIcon(full_path)
             if icon_tint:
-                # Render SVG to pixmap first, then apply tint
-                pixmap = icon.pixmap(icon_size, icon_size)
+                pixmap = icon.pixmap(phys_size, phys_size)
+                pixmap.setDevicePixelRatio(dpr)
                 if not pixmap.isNull():
                     pixmap = self._apply_tint(pixmap, icon_tint)
                     self.setIcon(QIcon(pixmap))
@@ -286,7 +288,8 @@ class ShelfButton(QToolButton):
         else:
             pixmap = QPixmap(full_path)
             if not pixmap.isNull():
-                scaled = pixmap.scaled(icon_size, icon_size, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                scaled = pixmap.scaled(phys_size, phys_size, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                scaled.setDevicePixelRatio(dpr)
                 if icon_tint:
                     scaled = self._apply_tint(scaled, icon_tint)
                 self.setIcon(QIcon(scaled))
@@ -516,8 +519,8 @@ class ShelfButton(QToolButton):
         r, g, b = [int(c * 255) for c in tint_color[:3]]
         tint = QColor(r, g, b)
 
-        # Create a copy to paint on
         result = QPixmap(pixmap.size())
+        result.setDevicePixelRatio(pixmap.devicePixelRatio())
         result.fill(Qt.transparent)
 
         painter = QPainter(result)
