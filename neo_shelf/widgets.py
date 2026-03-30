@@ -250,7 +250,7 @@ class ShelfButton(QToolButton):
         self._update_appearance()
 
     def _update_appearance(self):
-        icon_size = max(self._icon_size, 35)
+        icon_size = max(self._icon_size, 10)
         label = self._data.get("label", "")
 
         self.setToolButtonStyle(Qt.ToolButtonIconOnly)
@@ -269,13 +269,15 @@ class ShelfButton(QToolButton):
             full_path = ":{}".format(icon_path)
 
         icon_tint = self._data.get("icon_tint")
+        dpr = QApplication.instance().devicePixelRatio()
+        phys_size = int(icon_size * dpr)
 
         # SVG files need QIcon directly, raster images use QPixmap for scaling
         if icon_path.lower().endswith(".svg"):
             icon = QIcon(full_path)
             if icon_tint:
-                # Render SVG to pixmap first, then apply tint
-                pixmap = icon.pixmap(icon_size, icon_size)
+                pixmap = icon.pixmap(phys_size, phys_size)
+                pixmap.setDevicePixelRatio(dpr)
                 if not pixmap.isNull():
                     pixmap = self._apply_tint(pixmap, icon_tint)
                     self.setIcon(QIcon(pixmap))
@@ -286,7 +288,8 @@ class ShelfButton(QToolButton):
         else:
             pixmap = QPixmap(full_path)
             if not pixmap.isNull():
-                scaled = pixmap.scaled(icon_size, icon_size, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                scaled = pixmap.scaled(phys_size, phys_size, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                scaled.setDevicePixelRatio(dpr)
                 if icon_tint:
                     scaled = self._apply_tint(scaled, icon_tint)
                 self.setIcon(QIcon(scaled))
@@ -516,8 +519,8 @@ class ShelfButton(QToolButton):
         r, g, b = [int(c * 255) for c in tint_color[:3]]
         tint = QColor(r, g, b)
 
-        # Create a copy to paint on
         result = QPixmap(pixmap.size())
+        result.setDevicePixelRatio(pixmap.devicePixelRatio())
         result.fill(Qt.transparent)
 
         painter = QPainter(result)
@@ -662,6 +665,20 @@ class FlowBreakWidget(QWidget):
         self._drag_start_pos = None
 
 
+class ShelfScrollArea(QScrollArea):
+    def __init__(self, parent=None):
+        super(ShelfScrollArea, self).__init__(parent)
+        self.redirect_wheel = False
+
+    def wheelEvent(self, event):
+        if self.redirect_wheel:
+            bar = self.horizontalScrollBar()
+            bar.setValue(bar.value() - event.angleDelta().y())
+            event.accept()
+        else:
+            super(ShelfScrollArea, self).wheelEvent(event)
+
+
 class ShelfPanel(MayaQWidgetDockableMixin, QWidget):
     """Dockable shelf panel widget."""
 
@@ -690,7 +707,7 @@ class ShelfPanel(MayaQWidgetDockableMixin, QWidget):
         self._main_layout.setContentsMargins(2, 2, 2, 2)
         self._main_layout.setSpacing(0)
 
-        self._scroll = QScrollArea()
+        self._scroll = ShelfScrollArea()
         self._scroll.setWidgetResizable(True)
         self._scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         self._scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
@@ -724,6 +741,8 @@ class ShelfPanel(MayaQWidgetDockableMixin, QWidget):
             "right": Qt.AlignRight
         }
         h_align = h_align_map.get(alignment, Qt.AlignLeft)
+
+        self._scroll.redirect_wheel = (layout_mode == "horizontal")
 
         if layout_mode == "horizontal":
             self._button_layout = QHBoxLayout(self._content)

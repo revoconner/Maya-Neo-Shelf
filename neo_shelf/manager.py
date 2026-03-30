@@ -433,7 +433,7 @@ class ShelfManager(QDialog):
         # Icon size
         size_row = QHBoxLayout()
         self._shelf_icon_size = QSpinBox()
-        self._shelf_icon_size.setRange(35, 150)
+        self._shelf_icon_size.setRange(10, 150)
         self._shelf_icon_size.setValue(55)
         self._shelf_icon_size.valueChanged.connect(self._on_shelf_setting_changed)
         size_row.addWidget(self._shelf_icon_size)
