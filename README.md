@@ -17,6 +17,8 @@
 - Vertical, horizontal or flow design
 - Edit multiple items in one go.
 - Close shelf without losing data
+- Horizontal shelves scroll horizontally on scroll wheel. (v1.1)
+- hiDPI support (v1.1)
 
 <details><summary> <h3> Open Screenshots </h3> </summary>
   
