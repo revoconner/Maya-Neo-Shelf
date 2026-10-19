@@ -1,5 +1,5 @@
 try:
-    from PySide6.QtCore import Qt, Signal, QEvent
+    from PySide6.QtCore import Qt, Signal, QEvent, QTimer
     from PySide6.QtWidgets import (
         QDialog, QVBoxLayout, QHBoxLayout, QSplitter, QListWidget,
         QListWidgetItem, QPushButton, QLabel, QLineEdit, QFormLayout,
@@ -10,7 +10,7 @@ try:
     )
     from PySide6.QtGui import QIcon, QColor
 except ImportError:
-    from PySide2.QtCore import Qt, Signal, QEvent
+    from PySide2.QtCore import Qt, Signal, QEvent, QTimer
     from PySide2.QtWidgets import (
         QDialog, QVBoxLayout, QHBoxLayout, QSplitter, QListWidget,
         QListWidgetItem, QPushButton, QLabel, QLineEdit, QFormLayout,
@@ -748,22 +748,36 @@ class ShelfManager(QDialog):
         self._shelf_close_btn.setEnabled(is_open)
         self._shelf_refresh_btn.setEnabled(is_open)
 
-    def _refresh_shelf_list(self):
+
+    def _refresh_shelf_list(self, reload=True):
+        """Rebuild the shelf list, keeping the current shelf selected.
+        reload=False: only the [CLOSED] labels changed (open/close panel), so
+        reselect the shelf silently and leave the button list alone."""
+        current = self._current_shelf
+
+        # clear() would emit currentRowChanged(-1) and reset _current_shelf
+        self._shelf_list.blockSignals(True)
         self._shelf_list.clear()
         for name in core.get_all_shelf_names():
             display = self._get_shelf_display_name(name)
             self._shelf_list.addItem(QListWidgetItem(display))
+        self._shelf_list.blockSignals(False)
 
-        selected = False
-        if self._current_shelf:
-            display = self._get_shelf_display_name(self._current_shelf)
-            items = self._shelf_list.findItems(display, Qt.MatchExactly)
+        item = None
+        if current:
+            items = self._shelf_list.findItems(self._get_shelf_display_name(current), Qt.MatchExactly)
             if items:
-                self._shelf_list.setCurrentItem(items[0])
-                selected = True
+                item = items[0]
 
-        # Fallback: select first item if nothing selected
-        if not selected and self._shelf_list.count() > 0:
+        if item is not None:
+            if reload:
+                self._shelf_list.setCurrentItem(item)
+            else:
+                self._shelf_list.blockSignals(True)
+                self._shelf_list.setCurrentItem(item)
+                self._shelf_list.blockSignals(False)
+        elif self._shelf_list.count() > 0:
+            # Fallback: select first item if the shelf is gone
             self._shelf_list.setCurrentRow(0)
 
     def _select_shelf_by_name(self, name):
@@ -924,14 +938,14 @@ class ShelfManager(QDialog):
     def _open_shelf_panel(self):
         if self._current_shelf:
             widgets.create_panel(self._current_shelf)
-            self._refresh_shelf_list()
+            self._refresh_shelf_list(reload=False)
             self._update_panel_buttons()
 
     def _close_shelf_panel(self):
         if self._current_shelf:
             panel_name = widgets.PANEL_PREFIX + self._current_shelf.replace(" ", "_") + "WorkspaceControl"
             widgets.close_panel(panel_name)
-            self._refresh_shelf_list()
+            self._refresh_shelf_list(reload=False)
             self._update_panel_buttons()
 
     def _refresh_current_panel(self):
@@ -1219,6 +1233,7 @@ class ShelfManager(QDialog):
         }
 
         core.update_button(self._current_shelf, idx, updates)
+        self._refresh_panels()
 
         # Update list item display
         item = self._button_list.item(idx)
@@ -1301,19 +1316,48 @@ class ShelfManager(QDialog):
     def _on_icon_selected(self, icon_name):
         self._btn_icon_edit.setText(core.relative_icon_path(icon_name))
 
+
+    # insert after selection, select the result
+    def _insert_index(self):
+        """Index just after the last selected row, or None (= append) if nothing is selected."""
+        if self._current_button_indices:
+            return max(self._current_button_indices) + 1
+        return None
+
+    def _select_button_rows(self, rows):
+        """Select the given rows in the button list and update the property panel once."""
+        count = self._button_list.count()
+        rows = [r for r in rows if 0 <= r < count]
+        if not rows:
+            return
+        self._button_list.blockSignals(True)
+        self._button_list.clearSelection()
+        self._button_list.setCurrentRow(rows[0])
+        for r in rows:
+            self._button_list.item(r).setSelected(True)
+        self._button_list.blockSignals(False)
+        self._on_button_selection_changed()
+
     def _add_button(self):
         if not self._current_shelf:
             return
+        index = self._insert_index()
         new_btn = core.make_default_button(command="print('new')")
-        core.add_button_to_shelf(self._current_shelf, new_btn)
+        core.add_button_to_shelf(self._current_shelf, new_btn, index)
         self._refresh_button_list()
-        self._button_list.setCurrentRow(self._button_list.count() - 1)
+        row = self._button_list.count() - 1 if index is None else index
+        self._select_button_rows([row])
+        self._refresh_panels()
 
     def _add_separator(self):
         if not self._current_shelf:
             return
-        core.add_button_to_shelf(self._current_shelf, core.make_separator())
+        index = self._insert_index()
+        core.add_button_to_shelf(self._current_shelf, core.make_separator(), index)
         self._refresh_button_list()
+        row = self._button_list.count() - 1 if index is None else index
+        self._select_button_rows([row])
+        self._refresh_panels()
 
     def _duplicate_button(self):
         if not self._current_shelf or not self._current_button_indices:
@@ -1325,21 +1369,32 @@ class ShelfManager(QDialog):
 
         buttons = shelf_data.get("buttons", [])
         import copy
+        insert_at = self._insert_index()  # copies go after the last selected button
+        new_rows = []
         for idx in sorted(self._current_button_indices):
             if idx < len(buttons):
-                core.add_button_to_shelf(self._current_shelf, copy.deepcopy(buttons[idx]))
+                core.add_button_to_shelf(self._current_shelf, copy.deepcopy(buttons[idx]), insert_at)
+                new_rows.append(insert_at)
+                insert_at += 1
 
         self._refresh_button_list()
+        self._select_button_rows(new_rows)
+        self._refresh_panels()
 
     def _delete_button(self):
         if not self._current_shelf or not self._current_button_indices:
             return
-
+        first_deleted = min(self._current_button_indices)
         for idx in sorted(self._current_button_indices, reverse=True):
             core.remove_button(self._current_shelf, idx)
 
         self._current_button_indices = []
         self._refresh_button_list()
+        # Select the button before the deleted one; if the first one was
+        # deleted, select the new first button. Nothing if the list is empty.
+        self._select_button_rows([max(first_deleted - 1, 0)])
+        self._refresh_panels()
+
 
     def _transfer_buttons(self, target_shelf):
         if not self._current_shelf or not self._current_button_indices:
@@ -1389,6 +1444,9 @@ class ShelfManager(QDialog):
             insert_pos = row if row < start else row - 1
             buttons.insert(insert_pos, btn)
             core.update_shelf_buttons(self._current_shelf, buttons)
+            # Update the shelf windows. Deferred: rowsMoved fires in
+            # the middle of the drop, so don't run processEvents inside it.
+            QTimer.singleShot(0, self._refresh_panels)
 
     # Submenu operations
     def _refresh_submenu_list(self):
@@ -1528,9 +1586,19 @@ def show_with_button(shelf_name, button_index):
     _manager_instance.show()
 
 
+def notify_shelf_changed(shelf_name):
+    """Called by widgets.py after a shelf window changed a shelf's buttons."""
+    try:
+        if _manager_instance and _manager_instance.isVisible() \
+                and _manager_instance._current_shelf == shelf_name:
+            _manager_instance._refresh_button_list()
+    except RuntimeError:
+        pass  # manager window was already deleted
+
+
 def notify_panel_closed(workspace_name):
     """Called by widgets.py when a panel is closed externally."""
     global _manager_instance
     if _manager_instance and _manager_instance.isVisible():
-        _manager_instance._refresh_shelf_list()
+        _manager_instance._refresh_shelf_list(reload=False)
         _manager_instance._update_panel_buttons()

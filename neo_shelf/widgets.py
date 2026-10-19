@@ -42,6 +42,15 @@ def _on_panel_closed(workspace_name):
         pass
 
 
+def _notify_manager(shelf_name):
+    """Tell the manager (if it is open) that this shelf's buttons changed."""
+    try:
+        from . import manager
+        manager.notify_shelf_changed(shelf_name)
+    except Exception:
+        pass
+
+
 def _register_panel_close_callback(workspace_name):
     """Register closeCommand callback and set flags on workspace control."""
     cmd = "from neo_shelf import widgets; widgets._on_panel_closed('{}')".format(workspace_name)
@@ -819,10 +828,12 @@ class ShelfPanel(MayaQWidgetDockableMixin, QWidget):
         if result == "Yes":
             core.remove_button(self._shelf_name, index)
             self.refresh()
+            _notify_manager(self._shelf_name)
 
     def _on_move_button(self, from_idx, to_idx):
         core.move_button(self._shelf_name, from_idx, to_idx)
         self.refresh()
+        _notify_manager(self._shelf_name)
 
     def _show_shelf_menu(self, pos):
         menu = QMenu(self)
@@ -853,11 +864,13 @@ class ShelfPanel(MayaQWidgetDockableMixin, QWidget):
         new_btn = core.make_default_button(command="print('new button')")
         core.add_button_to_shelf(self._shelf_name, new_btn)
         self.refresh()
+        _notify_manager(self._shelf_name)
 
     def _add_separator(self):
         sep = core.make_separator()
         core.add_button_to_shelf(self._shelf_name, sep)
         self.refresh()
+        _notify_manager(self._shelf_name)
 
     def _open_shelf_settings(self):
         try:
@@ -923,6 +936,7 @@ class ShelfPanel(MayaQWidgetDockableMixin, QWidget):
                     target_idx -= 1
                 core.move_button(self._shelf_name, source_idx, target_idx)
                 self.refresh()
+                _notify_manager(self._shelf_name)
             event.acceptProposedAction()
         elif mime.hasText():
             code = mime.text().strip()
@@ -947,6 +961,7 @@ class ShelfPanel(MayaQWidgetDockableMixin, QWidget):
         new_btn = core.make_default_button(command=code, command_type=script_type)
         core.add_button_to_shelf(self._shelf_name, new_btn)
         self.refresh()
+        _notify_manager(self._shelf_name)
         cmds.inViewMessage(
             amg="Button added to shelf <hl>{}</hl>".format(self._shelf_name),
             pos="botCenter", fade=True, fadeStayTime=1000
