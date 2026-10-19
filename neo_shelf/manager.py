@@ -22,6 +22,7 @@ except ImportError:
     from PySide2.QtGui import QIcon, QColor
 
 import maya.cmds as cmds
+import maya.mel as mel
 from . import core
 from . import widgets
 
@@ -541,6 +542,7 @@ class ShelfManager(QDialog):
         icon_row = QHBoxLayout()
         self._btn_icon_edit = QLineEdit()
         self._btn_icon_edit.textChanged.connect(self._on_button_prop_changed)
+        self._btn_icon_edit.editingFinished.connect(self._on_icon_edit_finished)
         icon_row.addWidget(self._btn_icon_edit, 1)
         self._btn_icon_browse = QPushButton("Browse")
         self._btn_icon_browse.setFixedWidth(90)
@@ -955,11 +957,7 @@ class ShelfManager(QDialog):
             else:
                 display = btn.get("name") or btn.get("label") or btn.get("icon", "Button")
                 item = QListWidgetItem(display)
-                icon_path = btn.get("icon", "commandButton.png")
-                if not ("/" in icon_path or "\\" in icon_path):
-                    item.setIcon(QIcon(":{}".format(icon_path)))
-                else:
-                    item.setIcon(QIcon(icon_path))
+                item.setIcon(self._make_icon(btn.get("icon", "commandButton.png")))
             self._button_list.addItem(item)
 
         self._update_transfer_menus()
@@ -1227,11 +1225,7 @@ class ShelfManager(QDialog):
         if item:
             display = updates["name"] or updates["label"] or updates["icon"]
             item.setText(display)
-            icon_path = updates["icon"]
-            if not ("/" in icon_path or "\\" in icon_path):
-                item.setIcon(QIcon(":{}".format(icon_path)))
-            else:
-                item.setIcon(QIcon(icon_path))
+            item.setIcon(self._make_icon(updates["icon"]))
 
     def _on_button_color_changed(self, color_value):
         if not self._current_shelf or not self._current_button_indices:
@@ -1259,7 +1253,44 @@ class ShelfManager(QDialog):
             if idx < len(buttons) and not buttons[idx].get("separator"):
                 core.update_button(self._current_shelf, idx, {key: color_value})
 
+    # relative icon path support
+    def _make_icon(self, icon_path):
+        """QIcon for a bare name (Maya resource / icon path) or a full path."""
+        if not icon_path:
+            return QIcon()
+        return QIcon(core.resolve_icon_path(icon_path))
+
+    def _on_icon_edit_finished(self):
+        """Typed/pasted path: shorten to a relative name when possible."""
+        raw = self._btn_icon_edit.text()
+        cleaned = core.relative_icon_path(raw.strip().strip('"'))
+        if cleaned != raw:
+            self._btn_icon_edit.setText(cleaned)  # triggers the normal save
+
     def _browse_icon(self):
+        menu = QMenu(self)
+        menu.addAction("Maya Icons...", self._browse_maya_icons)
+        menu.addAction("Browse File...", self._browse_icon_file)
+        menu.exec_(self._btn_icon_browse.mapToGlobal(
+            self._btn_icon_browse.rect().bottomLeft()))
+
+    def _browse_icon_file(self):
+        try:
+            filters = mel.eval("buildPixmapFileFilterList()")
+        except Exception:
+            filters = "All Files (*.*)"
+        file_list = cmds.fileDialog2(
+            caption="Pick Icon",
+            fileMode=1,
+            okCaption="Pick Icon",
+            fileFilter=filters,
+            startingDirectory=cmds.internalVar(userBitmapsDir=True),
+        )
+        if file_list and file_list[0]:
+            self._on_icon_selected(file_list[0])
+
+
+    def _browse_maya_icons(self):
         try:
             from . import icon_chooser
             chooser = icon_chooser.IconChooserDialog(callback=self._on_icon_selected, parent=self)
@@ -1268,7 +1299,7 @@ class ShelfManager(QDialog):
             cmds.warning("[neo_shelf] Icon chooser error: {}".format(e))
 
     def _on_icon_selected(self, icon_name):
-        self._btn_icon_edit.setText(icon_name)
+        self._btn_icon_edit.setText(core.relative_icon_path(icon_name))
 
     def _add_button(self):
         if not self._current_shelf:

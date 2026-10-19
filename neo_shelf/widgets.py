@@ -261,12 +261,7 @@ class ShelfButton(QToolButton):
         self.setIconSize(QSize(icon_size, icon_size))
 
         icon_path = self._data.get("icon", "commandButton.png")
-        if icon_path.startswith(":/") or icon_path.startswith(":"):
-            full_path = icon_path
-        elif "/" in icon_path or "\\" in icon_path:
-            full_path = icon_path
-        else:
-            full_path = ":{}".format(icon_path)
+        full_path = core.resolve_icon_path(icon_path)
 
         icon_tint = self._data.get("icon_tint")
         dpr = QApplication.instance().devicePixelRatio()

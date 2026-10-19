@@ -2,6 +2,11 @@ import json
 import os
 import maya.cmds as cmds
 
+try:
+    from PySide6.QtCore import QFile
+except ImportError:
+    from PySide2.QtCore import QFile
+
 CONFIG_FILENAME = "neo_shelf_config.json"
 
 DEFAULT_SETTINGS = {
@@ -266,3 +271,67 @@ def set_trigger_settings(triggers):
     config = load_config()
     config.setdefault("settings", {})["triggers"] = triggers
     save_config()
+
+
+def icon_search_dirs():
+    """Directories Maya searches for icons (XBMLANGPATH + user bitmaps dir)."""
+    dirs = []
+    for d in os.environ.get("XBMLANGPATH", "").split(os.pathsep):
+        d = d.strip()
+        if d.endswith("%B"):
+            # Linux/macOS style entries end with a %B placeholder
+            d = d[:-2]
+        if d:
+            dirs.append(d)
+    user_dir = cmds.internalVar(userBitmapsDir=True)
+    if user_dir:
+        dirs.append(user_dir)
+    return dirs
+
+
+def relative_icon_path(path):
+    """If the file sits directly inside one of Maya's icon search directories,
+    return just the file name (relative); otherwise return the path with
+    forward slashes."""
+    if not path:
+        return path
+    path = path.replace("\\", "/")
+    file_name = os.path.basename(path)
+    if file_name == path or path.startswith(":"):
+        return path  # already relative / internal resource
+
+    def norm(p):
+        return os.path.normcase(os.path.normpath(p))
+
+    picked_dir = norm(os.path.dirname(path))
+    search_dirs = icon_search_dirs()
+    if picked_dir not in [norm(d) for d in search_dirs]:
+        return path  # not on the icon path, keep the full path
+
+    # Maya resolves a bare name using the first icon dir that contains it.
+    # Only shorten the path if that is the file that was picked.
+    for d in search_dirs:
+        if os.path.isfile(os.path.join(d, file_name)):
+            if norm(d) == picked_dir:
+                return file_name
+            cmds.warning('Another icon named "{}" earlier on the icon path '
+                         'would shadow this one; keeping the full path.'.format(file_name))
+            return path
+    return path
+
+
+def resolve_icon_path(icon):
+    """Path Qt can load for a stored icon value (bare name, resource or full path).
+    Bare names: built-in Maya resource first, then the icon search dirs."""
+    if not icon:
+        return icon
+    if icon.startswith(":") or "/" in icon or "\\" in icon:
+        return icon
+    resource = ":{}".format(icon)
+    if QFile.exists(resource):
+        return resource
+    for d in icon_search_dirs():
+        full = os.path.join(d, icon)
+        if os.path.isfile(full):
+            return full.replace("\\", "/")
+    return resource
